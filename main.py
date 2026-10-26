@@ -1,6 +1,7 @@
 import asyncio
-from pathlib import Path
 import json
+
+from core.paths import CONFIG_PATH
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
@@ -12,9 +13,6 @@ from core.api import monitor as api_monitor
 from core.api import launcher as api_launcher
 from core.api import vault as api_vault
 
-
-BASE_DIR = Path(__file__).resolve().parent
-CONFIG_PATH = BASE_DIR / "config.json"
 
 _config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
 HISTORY_INTERVAL = _config.get("monitor", {}).get("history_interval_seconds", 300)

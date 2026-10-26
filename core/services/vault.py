@@ -5,6 +5,8 @@ import subprocess
 import getpass
 import time
 
+from core.paths import VAULT_FILE
+
 from argon2.low_level import hash_secret_raw, Type
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
@@ -173,5 +175,4 @@ class Vault:
         return {"success": True, "deleted": key}
 
 
-_DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "vault.json"
-vault = Vault(_DATA_PATH)
+vault = Vault(VAULT_FILE)

@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from core.paths import MODULES_FILE
 
 
 _DEFAULT_STATE = {
@@ -56,5 +57,4 @@ class ModuleRegistry:
         return dict(self._state)
 
 
-_DATA_PATH = Path(__file__).resolve().parents[1] / "data" / "modules.json"
-registry = ModuleRegistry(_DATA_PATH)
+registry = ModuleRegistry(MODULES_FILE)

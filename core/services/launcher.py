@@ -2,6 +2,8 @@ import json
 import subprocess
 from pathlib import Path
 
+from core.paths import PROGRAMS_FILE
+
 
 class Launcher:
     def __init__(self, data_path: Path):
@@ -83,5 +85,4 @@ class Launcher:
             return {"success": False, "error": str(e)}
 
 
-_DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "programs.json"
-launcher = Launcher(_DATA_PATH)
+launcher = Launcher(PROGRAMS_FILE)

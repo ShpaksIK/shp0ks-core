@@ -4,6 +4,8 @@ import json
 from datetime import datetime, date
 from pathlib import Path
 
+from core.paths import HISTORY_DIR
+
 
 class Monitor:
     def __init__(self, history_dir: Path, history_retention_days: int = 7):
@@ -177,5 +179,4 @@ class Monitor:
         return {"success": True, "removed": removed}
 
 
-_DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "history"
-monitor = Monitor(_DATA_PATH)
+monitor = Monitor(HISTORY_DIR)
