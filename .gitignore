@@ -2,6 +2,7 @@ data/vault.json
 data/programs.json
 data/modules.json
 data/history/
+data/scripts/
 
 __pycache__/
 *.py[cod]

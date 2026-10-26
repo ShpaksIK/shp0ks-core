@@ -6,8 +6,9 @@ from core.paths import MODULES_FILE
 _DEFAULT_STATE = {
     "monitor": True,
     "launcher": True,
-    "voice": False,
-    "vault": False,
+    "voice": True,
+    "vault": True,
+    "script_runner": True,
 }
 
 

@@ -12,6 +12,7 @@ from core.api import modules as api_modules
 from core.api import monitor as api_monitor
 from core.api import launcher as api_launcher
 from core.api import vault as api_vault
+from core.api import script_runner as api_script_runner
 
 
 _config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
@@ -23,6 +24,7 @@ app.include_router(api_modules.router)
 app.include_router(api_monitor.router)
 app.include_router(api_launcher.router)
 app.include_router(api_vault.router)
+app.include_router(api_script_runner.router)
 
 
 class ConnectionManager:
