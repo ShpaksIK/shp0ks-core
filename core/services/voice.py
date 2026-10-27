@@ -4,23 +4,43 @@ import threading
 import time
 import pyperclip
 
+from pathlib import Path
 import sounddevice as sd
 from vosk import Model, KaldiRecognizer
 
 from core.services.tts import tts
 from core.registry import registry
-from core.paths import DATA_DIR
+from core.paths import DATA_DIR, CONFIG_PATH, VOICE_COMMANDS_FILE
 from core.services.launcher import launcher
 from core.services.script_runner import script_runner
 from core.services.vault import vault, VaultLockedError
 
-MODEL_PATH = DATA_DIR / "models" / "vosk-model-small-ru-0.22"
-COMMANDS_FILE = DATA_DIR / "voice_commands.json"
-SAMPLE_RATE = 16000
-BLOCK_SIZE = 8000
-
-DEFAULT_COMMANDS = {}
-WAKE_WORDS = ["джарвис", "дарвис", "джарвиз", "шпакс", "шпокс"]
+def _load_voice_config() -> dict:
+    """Чтение настроек из config.json."""
+    defaults = {
+        "model_path": str(DATA_DIR / "models" / "vosk-model-small-ru-0.22"),
+        "sample_rate": 16000,
+        "block_size": 8000,
+        "wake_words": ["джарвис", "дарвис", "джарвиз", "шпакс", "шпокс"],
+        "default_commands": {}
+    }
+    
+    try:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            config = json.load(f)
+            voice_cfg = config.get("voice", {})
+            
+            defaults.update({
+                "model_path": voice_cfg.get("model_path", defaults["model_path"]),
+                "sample_rate": voice_cfg.get("sample_rate", defaults["sample_rate"]),
+                "block_size": voice_cfg.get("block_size", defaults["block_size"]),
+                "wake_words": voice_cfg.get("wake_words", defaults["wake_words"]),
+                "default_commands": voice_cfg.get("default_commands", defaults["default_commands"]),
+            })
+    except (json.JSONDecodeError, OSError):
+        pass
+        
+    return defaults
 
 class Voice:
     def __init__(self):
@@ -29,35 +49,46 @@ class Voice:
         self._model: Model | None = None
         self._commands: dict = {}
         self._commands_mtime: float = 0.0
+
+        self._config = _load_voice_config()
+
+        p = Path(self._config["model_path"])
+        self._model_path = p if p.is_absolute() else CONFIG_PATH.parent / p
+
+        self._sample_rate = self._config["sample_rate"]
+        self._block_size = self._config["block_size"]
+        self._wake_words = self._config["wake_words"]
+        self._default_commands = self._config["default_commands"]
+
         self._load_commands(force=True)
 
     def _load_commands(self, force: bool = False) -> None:
         """Читает файл команд, если он изменился (или force=True)."""
-        if not COMMANDS_FILE.exists():
-            COMMANDS_FILE.parent.mkdir(parents=True, exist_ok=True)
-            COMMANDS_FILE.write_text(
-                json.dumps(DEFAULT_COMMANDS, ensure_ascii=False, indent=2),
+        if not VOICE_COMMANDS_FILE.exists():
+            VOICE_COMMANDS_FILE.parent.mkdir(parents=True, exist_ok=True)
+            VOICE_COMMANDS_FILE.write_text(
+                json.dumps(self._default_commands, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
-            self._commands = dict(DEFAULT_COMMANDS)
-            self._commands_mtime = COMMANDS_FILE.stat().st_mtime
+            self._commands = dict(self._default_commands)
+            self._commands_mtime = VOICE_COMMANDS_FILE.stat().st_mtime
             return
 
-        mtime = COMMANDS_FILE.stat().st_mtime
+        mtime = VOICE_COMMANDS_FILE.stat().st_mtime
         if not force and mtime == self._commands_mtime:
             return
 
         try:
-            with open(COMMANDS_FILE, "r", encoding="utf-8") as f:
+            with open(VOICE_COMMANDS_FILE, "r", encoding="utf-8") as f:
                 self._commands = json.load(f)
             self._commands_mtime = mtime
         except (json.JSONDecodeError, OSError):
             pass
 
     def _save_commands(self) -> None:
-        with open(COMMANDS_FILE, "w", encoding="utf-8") as f:
+        with open(VOICE_COMMANDS_FILE, "w", encoding="utf-8") as f:
             json.dump(self._commands, f, ensure_ascii=False, indent=2)
-        self._commands_mtime = COMMANDS_FILE.stat().st_mtime
+        self._commands_mtime = VOICE_COMMANDS_FILE.stat().st_mtime
 
     def list_commands(self) -> dict:
         self._load_commands()
@@ -100,11 +131,11 @@ class Voice:
     def start(self) -> dict:
         if self._running:
             return {"success": False, "error": "голосовой режим уже запущен"}
-        if not MODEL_PATH.exists():
-            return {"success": False, "error": f"модель не найдена: {MODEL_PATH}"}
+        if not self._model_path.exists():
+            return {"success": False, "error": f"модель не найдена: {self._model_path}"}
 
         try:
-            self._model = Model(str(MODEL_PATH))
+            self._model = Model(str(self._model_path))
         except Exception as e:
             return {"success": False, "error": f"не удалось загрузить модель: {e}"}
 
@@ -131,13 +162,13 @@ class Voice:
 
         try:
             with sd.RawInputStream(
-                samplerate=SAMPLE_RATE,
-                blocksize=BLOCK_SIZE,
+                samplerate=self._sample_rate,
+                blocksize=self._block_size,
                 dtype="int16",
                 channels=1,
                 callback=callback,
             ):
-                rec = KaldiRecognizer(self._model, SAMPLE_RATE)
+                rec = KaldiRecognizer(self._model, self._sample_rate)
                 rec.SetWords(True)
 
                 while self._running:
@@ -158,7 +189,7 @@ class Voice:
         self._load_commands()
 
         found_wake_word = None
-        for w in WAKE_WORDS:
+        for w in self._wake_words:
             if w in text:
                 found_wake_word = w
                 break

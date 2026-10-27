@@ -2,5 +2,12 @@
   "monitor": {
     "history_interval_seconds": 300,
     "retention_days": 7
+  },
+  "voice": {
+    "model_path": "data/models/vosk-model-small-ru-0.22",
+    "sample_rate": 16000,
+    "block_size": 8000,
+    "wake_words": ["джарвис", "дарвис", "джарвиз", "шпакс", "шпокс"],
+    "default_commands": {}
   }
 }

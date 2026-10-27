@@ -3,11 +3,7 @@ import subprocess
 import uuid
 import json
 from pathlib import Path
-from core.paths import DATA_DIR
-
-SCRIPTS_DIR = DATA_DIR / "scripts"
-SCRIPTS_DIR.mkdir(parents=True, exist_ok=True)
-REGISTRY_FILE = DATA_DIR / "scripts_registry.json"
+from core.paths import SCRIPTS_DIR, SCRIPTS_REGISTRY_FILE
 
 class ScriptRunner:
     def __init__(self):
@@ -15,18 +11,15 @@ class ScriptRunner:
         self._load_registry()
 
     def _load_registry(self):
-        if not REGISTRY_FILE.exists():
+        if not SCRIPTS_REGISTRY_FILE.exists():
             self._registry = {}
             self._save_registry()
             return
-        try:
-            with open(REGISTRY_FILE, "r", encoding="utf-8") as f:
-                self._registry = json.load(f)
-        except (json.JSONDecodeError, OSError):
-            self._registry = {}
+        with open(SCRIPTS_REGISTRY_FILE, "r", encoding="utf-8") as f:
+            self._registry = json.load(f)
 
     def _save_registry(self):
-        with open(REGISTRY_FILE, "w", encoding="utf-8") as f:
+        with open(SCRIPTS_REGISTRY_FILE, "w", encoding="utf-8") as f:
             json.dump(self._registry, f, ensure_ascii=False, indent=2)
 
     def set_alias(self, alias: str, filename: str) -> dict:
