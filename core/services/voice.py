@@ -50,6 +50,13 @@ class Voice:
         self._commands: dict = {}
         self._commands_mtime: float = 0.0
 
+        self._actions = {
+            "launcher_open": self._action_launcher_open,
+            "vault_get": self._action_vault_get,
+            "vault_lock": self._action_vault_lock,
+            "script_run": self._action_script_run,
+        }
+
         self._config = _load_voice_config()
 
         p = Path(self._config["model_path"])
@@ -185,6 +192,48 @@ class Voice:
         except Exception:
             self._running = False
 
+    # ---------- Обработчики действий ----------
+
+    def _action_launcher_open(self, arg, as_admin, clean_text=""):
+        res = launcher.open(arg)
+        if res.get("success"):
+            tts.say(f"Открываю {arg}")
+        else:
+            tts.say(f"Не удалось открыть {arg}")
+
+    def _action_vault_get(self, arg, as_admin, clean_text=""):
+        try:
+            res = vault.get(arg)
+            if res.get("success"):
+                password = res['password']
+                pyperclip.copy(password)
+                tts.say(f"Пароль скопирован")
+            else:
+                tts.say("Не удалось получить пароль")
+        except VaultLockedError:
+            tts.say("Хранилище заблокировано. Откройте его через интерфейс.")
+
+    def _action_vault_lock(self, arg, as_admin, clean_text=""):
+        vault.lock()
+        tts.say("Хранилище заблокировано")
+
+    def _action_script_run(self, arg, as_admin, clean_text=""):
+        # Если в JSON arg указан явно (например, "arg": "test.bat"), используем его
+        # Если arg = null, значит мы должны взять остаток текста после фразы-триггера
+        alias_to_run = arg
+
+        if not alias_to_run:
+            tts.say("Какой скрипт запустить?")
+            return
+        
+        res = script_runner.run_by_alias(alias_to_run, as_admin=as_admin)
+        if res.get("success"):
+            tts.say(f"Запускаю скрипт {alias_to_run}")
+        else:
+            tts.say(f"Ошибка: {res.get('error')}")
+
+    # ---------- Обработка команды ----------
+
     def _handle_command(self, text: str) -> None:
         self._load_commands()
 
@@ -205,6 +254,8 @@ class Voice:
 
         action = None
         arg = None
+        as_admin = False
+        matched_phrase = None
         sorted_commands = sorted(self._commands.items(), key=lambda x: len(x[0]), reverse=True)
         
         for phrase, cmd in sorted_commands:
@@ -212,53 +263,22 @@ class Voice:
                 action = cmd.get("action")
                 arg = cmd.get("arg")
                 as_admin = cmd.get("as_admin", False)
+                matched_phrase = phrase
                 break
 
         if action is None:
             tts.say("Команда не распознана")
             return
 
-        if action == "launcher_open":
-            res = launcher.open(arg)
-            if res.get("success"):
-                tts.say(f"Открываю {arg}")
+        handler = self._actions.get(action)
+        if handler:
+            if action == "script_run" and not arg:
+                alias_to_run = clean_text.replace(matched_phrase, "").strip(" ,.!?")
+                handler(alias_to_run, as_admin, clean_text)
             else:
-                tts.say(f"Не удалось открыть {arg}")
-
-        elif action == "vault_get":
-            try:
-                res = vault.get(arg)
-                if res.get("success"):
-                    password = res['password']
-                    pyperclip.copy(password)
-                    tts.say(f"Пароль скопирован")
-                else:
-                    tts.say("Не удалось получить пароль")
-            except VaultLockedError:
-                tts.say("Хранилище заблокировано. Откройте его через интерфейс.")
-
-        elif action == "vault_lock":
-            vault.lock()
-            tts.say("Хранилище заблокировано")
-
-        elif action == "script_run":
-            # Если в JSON arg указан явно (например, "arg": "test.bat"), используем его
-            # Если arg = null, значит мы должны взять остаток текста после фразы-триггера
-            alias_to_run = arg
-
-            if not alias_to_run:
-                # Убираем из текста саму фразу-триггер и лишние знаки
-                alias_to_run = clean_text.replace(phrase, "").strip(" ,.!?")
-
-            if not alias_to_run:
-                tts.say("Какой скрипт запустить?")
-                return
-            
-            res = script_runner.run_by_alias(alias_to_run, as_admin=as_admin)
-            if res.get("success"):
-                tts.say(f"Запускаю скрипт {alias_to_run}")
-            else:
-                tts.say(f"Ошибка: {res.get('error')}")
+                handler(arg, as_admin, clean_text)
+        else:
+            tts.say(f"Неизвестное действие: {action}")
 
 
 voice = Voice()
