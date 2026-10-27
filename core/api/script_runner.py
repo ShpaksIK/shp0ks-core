@@ -1,8 +1,29 @@
+from pydantic import BaseModel
 from fastapi import APIRouter, UploadFile, File, Form
 from core.decorators import require_module
 from core.services.script_runner import script_runner
 
 router = APIRouter(prefix="/scripts", tags=["scripts"])
+
+class AliasIn(BaseModel):
+    alias: str
+    filename: str
+
+
+@router.post("/alias")
+@require_module("script_runner")
+def set_alias(payload: AliasIn):
+    return script_runner.set_alias(payload.alias, payload.filename)
+
+@router.get("/aliases")
+@require_module("script_runner")
+def list_aliases():
+    return script_runner.list_aliases()
+
+@router.post("/run_alias/{alias}")
+@require_module("script_runner")
+def run_by_alias(alias: str, as_admin: bool = Form(False)):
+    return script_runner.run_by_alias(alias, as_admin)
 
 @router.get("/list")
 @require_module("script_runner")

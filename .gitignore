@@ -1,8 +1,11 @@
 data/vault.json
 data/programs.json
 data/modules.json
+data/voice_commands.json
+data/scripts_registry.json
 data/history/
 data/scripts/
+data/models/
 
 __pycache__/
 *.py[cod]

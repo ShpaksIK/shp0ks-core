@@ -1,13 +1,60 @@
 import ctypes
 import subprocess
 import uuid
+import json
 from pathlib import Path
 from core.paths import DATA_DIR
 
 SCRIPTS_DIR = DATA_DIR / "scripts"
 SCRIPTS_DIR.mkdir(parents=True, exist_ok=True)
+REGISTRY_FILE = DATA_DIR / "scripts_registry.json"
 
 class ScriptRunner:
+    def __init__(self):
+        self._registry = {}
+        self._load_registry()
+
+    def _load_registry(self):
+        if not REGISTRY_FILE.exists():
+            self._registry = {}
+            self._save_registry()
+            return
+        try:
+            with open(REGISTRY_FILE, "r", encoding="utf-8") as f:
+                self._registry = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            self._registry = {}
+
+    def _save_registry(self):
+        with open(REGISTRY_FILE, "w", encoding="utf-8") as f:
+            json.dump(self._registry, f, ensure_ascii=False, indent=2)
+
+    def set_alias(self, alias: str, filename: str) -> dict:
+        """Привязывает алиас к файлу скрипта."""
+        alias = alias.strip().lower()
+        file_path = SCRIPTS_DIR / filename
+        
+        if not file_path.is_file():
+            return {"success": False, "error": f"Файл {filename} не найден"}
+            
+        self._registry[alias] = filename
+        self._save_registry()
+        return {"success": True, "alias": alias, "filename": filename}
+
+    def list_aliases(self) -> dict:
+        return {"success": True, "aliases": self._registry}
+
+    def run_by_alias(self, alias: str, as_admin: bool = False) -> dict:
+        """Запускает скрипт по его алиасу."""
+        alias = alias.strip().lower()
+        filename = self._registry.get(alias)
+        
+        if not filename:
+            return {"success": False, "error": f"Алиас '{alias}' не найден"}
+            
+        # Вызываем существующий метод запуска
+        return self.run_existing(filename, as_admin)
+
     async def save_upload(self, file) -> dict:
         """Сохраняет файл и возвращает путь. Не выполняет."""
         original_name = Path(file.filename).name
