@@ -3,6 +3,8 @@ import queue
 import threading
 import time
 import pyperclip
+import webbrowser
+import urllib.parse
 
 from pathlib import Path
 import sounddevice as sd
@@ -55,6 +57,7 @@ class Voice:
             "vault_get": self._action_vault_get,
             "vault_lock": self._action_vault_lock,
             "script_run": self._action_script_run,
+            "search": self._action_search,
         }
 
         self._config = _load_voice_config()
@@ -217,6 +220,15 @@ class Voice:
         vault.lock()
         tts.say("Хранилище заблокировано")
 
+    def _action_search(self, query, base_url):        
+        if not query:
+            tts.say("Что найти?")
+            return
+        encoded_query = urllib.parse.quote_plus(query)
+        url = f"{base_url}{encoded_query}"
+        webbrowser.open(url)
+        tts.say(f"Ищу {query}")
+
     def _action_script_run(self, arg, as_admin, clean_text=""):
         # Если в JSON arg указан явно (например, "arg": "test.bat"), используем его
         # Если arg = null, значит мы должны взять остаток текста после фразы-триггера
@@ -275,6 +287,10 @@ class Voice:
             if action == "script_run" and not arg:
                 alias_to_run = clean_text.replace(matched_phrase, "").strip(" ,.!?")
                 handler(alias_to_run, as_admin, clean_text)
+            elif action == "search":
+                base_url = arg or "https://www.google.com/search?q="
+                query = clean_text.replace(matched_phrase, "").strip(" ,.!?")
+                self._action_search(query, base_url)
             else:
                 handler(arg, as_admin, clean_text)
         else:
